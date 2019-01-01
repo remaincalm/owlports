@@ -32,11 +32,11 @@ template <class T, int U = 2400 > class SmoothParam {
 		}
 
 		SmoothParam<T, U>& operator=(T f) {
-			if (fabs(end - f) > 0.01) {
+			//if (fabs(end - f) > 0.01) {
 				start = value;
 				end = f;
 				t = 0;
-			}
+			//}
 			return *this;
 		}
 
@@ -127,10 +127,6 @@ class Mud : public Patch {
 			registerParameter(PARAMETER_D, "");
 
 			srate = getSampleRate();
-			mix_ = 0.9f; // 0.7f;
-			mix_.complete();
-			filter_ = 50.0f;
-			lfo_ = 30.0f;
 		};
 
 		void processAudio(AudioBuffer &buffer) override;
@@ -155,12 +151,12 @@ class Mud : public Patch {
 		SmoothParam<float> mix_ = 1.0;
 
 		// LFO
-		float lfo_ = 0;
+		float lfo_ = 50;
 		long lfo_counter_ = 0;
 		float prv_filter_ = 0;
 
 		// filter
-		float filter_ = 0;
+		float filter_ = 50;
 		float filter_cutoff_ = 0;
 		float filter_res_ = 0;
 		SmoothParam<float, 128> filter_gain_comp_ = 1.0;
