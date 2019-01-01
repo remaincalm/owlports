@@ -125,19 +125,18 @@ public:
         registerParameter(PARAMETER_C, "LFO");
         registerParameter(PARAMETER_D, "");
 
-        srate = getSampleRate();
-	    mix_ = 0.9f; // 0.7f;
+      	srate = getSampleRate();
+	mix_ = 0.9f; // 0.7f;
         mix_.complete();
         filter_ = 50.0f;
-	    lfo_ =30.0f;
-
+	lfo_ = 30.0f;
     };
     
     void processAudio(AudioBuffer &buffer) override;
+    void encoderChanged(PatchParameterId pid, int16_t delta, uint16_t samples) override;
 
 private:
     void fixFilterParams();
-    void fixLfoParams();
 
     signal_t preSaturate(const signal_t in) const;
     signal_t postSaturate(const signal_t in) const;
@@ -219,64 +218,81 @@ void Mud::fixFilterParams() {
     hpf_.one_minus_rc = 1.0 - (hr * hc);
 }
 
+
+void Mud::encoderChanged(PatchParameterId pid, int16_t delta, uint16_t samples) {
+    switch(pid) {
+    case PARAMETER_A:
+			mix_ = getParameterValue(PARAMETER_A); 
+			break;
+
+		case PARAMETER_B:
+			filter_ = 100.0f * getParameterValue(PARAMETER_B);
+			break;
+			
+		case PARAMETER_C:
+			lfo_ = 200.0f * getParameterValue(PARAMETER_C) - 100.0f;
+			break;
+
+		default:
+			break;
+	}
+}
+
 /**
   Run/process function for plugins without MIDI input.
- */
+  */
 void Mud::processAudio(AudioBuffer &buffer) {
 
-    FloatArray left_buf = buffer.getSamples(LEFT_CHANNEL);
-    FloatArray right_buf = buffer.getSamples(RIGHT_CHANNEL);
-    
-    // TODO(dca): Figure out how to get this on demand.
-    mix_ = getParameterValue(PARAMETER_A); 
-    filter_ = 100.0f * getParameterValue(PARAMETER_B);
-    lfo_ = 200.0f * getParameterValue(PARAMETER_C) - 100.0f;
-    fixFilterParams();
+	FloatArray left_buf = buffer.getSamples(LEFT_CHANNEL);
+	FloatArray right_buf = buffer.getSamples(RIGHT_CHANNEL);
 
-    for (int i = 0; i < buffer.getSize(); ++i) {
-      left_buf[i] = process(left_, left_buf[i]);
-      right_buf[i] = process(right_, right_buf[i]);
-      tick();
-    }
+	// Recalc main params once per-block.
+	fixFilterParams();
+
+	for (int i = 0; i < buffer.getSize(); ++i) {
+		left_buf[i] = process(left_, left_buf[i]);
+		right_buf[i] = process(right_, right_buf[i]);
+		tick();
+	}
 }
 
 signal_t Mud::process(Channel& ch, const signal_t in) {
-    signal_t curr = preSaturate(in);
-    curr = filterLPF(ch, curr);
-    curr = filterHPF(ch, curr);
-    curr = postSaturate(curr);
-    curr = ch.dc_filter.process(curr);
+	signal_t curr = preSaturate(in);
+	curr = filterLPF(ch, curr);
+	curr = filterHPF(ch, curr);
+	curr = postSaturate(curr);
+	curr = ch.dc_filter.process(curr);
 
-    if (mix_ < 0.5) {
-        // dry full vol, fade in wet
-        return in + 2.0 * mix_ * curr;
-    } else {
-        // wet full vol, fade out dry
-        return curr + 2.0 * (1.0 - mix_) * in;
-    }
+	if (mix_ < 0.5) {
+		// dry full vol, fade in wet
+		return in + 2.0 * mix_ * curr;
+	} else {
+		// wet full vol, fade out dry
+		return curr + 2.0 * (1.0 - mix_) * in;
+	}
 }
 
 signal_t Mud::preSaturate(const signal_t in) const {
-    signal_t curr = (1.0 + PRE_SHAPER) * in / (1.0 + PRE_SHAPER * fabs(in));
-    return fmax(fmin(curr, CLAMP), -CLAMP);
+	signal_t curr = (1.0 + PRE_SHAPER) * in / (1.0 + PRE_SHAPER * fabs(in));
+	return fmax(fmin(curr, CLAMP), -CLAMP);
 }
 
 signal_t Mud::postSaturate(const signal_t in) const {
-    return (1.0 + POST_SHAPER)*in / (1.0 + POST_SHAPER * fabs(in));
+	return (1.0 + POST_SHAPER)*in / (1.0 + POST_SHAPER * fabs(in));
 }
 
 // Applies a bandpass filter to the current sample.
 
 float Mud::filterLPF(Channel& ch, const float in) const {
-    ch.v0 = (lpf_.one_minus_rc) * ch.v0 + lpf_.c * (in - ch.v1);
-    ch.v1 = (lpf_.one_minus_rc) * ch.v1 + lpf_.c * ch.v0;
-    return ch.v1;
+	ch.v0 = (lpf_.one_minus_rc) * ch.v0 + lpf_.c * (in - ch.v1);
+	ch.v1 = (lpf_.one_minus_rc) * ch.v1 + lpf_.c * ch.v0;
+	return ch.v1;
 }
 
 float Mud::filterHPF(Channel& ch, const float in) const {
-    ch.hv0 = (hpf_.one_minus_rc) * ch.hv0 + hpf_.c * (in - ch.hv1);
-    ch.hv1 = (hpf_.one_minus_rc) * ch.hv1 + hpf_.c * ch.hv0;
-    return in - ch.hv1;
+	ch.hv0 = (hpf_.one_minus_rc) * ch.hv0 + hpf_.c * (in - ch.hv1);
+	ch.hv1 = (hpf_.one_minus_rc) * ch.hv1 + hpf_.c * ch.hv0;
+	return in - ch.hv1;
 }
 
 
