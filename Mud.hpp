@@ -2,7 +2,6 @@
 
 
 /* start util.hpp */
-// #include "math.h"
 
 typedef int samples_t; // integral sample length or position
 typedef float signal_t; // signal value
@@ -32,7 +31,7 @@ template <class T, int U = 2400 > class SmoothParam {
 		}
 
 		SmoothParam<T, U>& operator=(T f) {
-			//if (fabs(end - f) > 0.01) {
+			//if (fabs(end - f) > 0.0001) {
 				start = value;
 				end = f;
 				t = 0;
@@ -85,7 +84,7 @@ template <class T, int U = 2400 > class SmoothParam {
 
 
 // waveshapes
-const float PRE_SHAPER = 0.4;
+const float PRE_SHAPER = 0.5;
 const float POST_SHAPER = 0.8;
 const float CLAMP = 0.98;
 
@@ -123,8 +122,8 @@ class Mud : public Patch {
 		Mud() : Patch() {
 			registerParameter(PARAMETER_A, "Mix");
 			registerParameter(PARAMETER_B, "Filter");
-			registerParameter(PARAMETER_C, "LFO");
-			registerParameter(PARAMETER_D, "");
+			registerParameter(PARAMETER_C, "LFO Rate");
+			registerParameter(PARAMETER_D, "LFO Depth");
 
 			srate = getSampleRate();
 		};
@@ -142,7 +141,6 @@ class Mud : public Patch {
 		signal_t process(Channel& ch, const signal_t in);
 
 		Channel left_;
-		Channel right_;
 		Filter lpf_;
 		Filter hpf_;
 
@@ -151,7 +149,8 @@ class Mud : public Patch {
 		SmoothParam<float> mix_ = 1.0;
 
 		// LFO
-		float lfo_ = 50;
+		float lfo_rate_ = 0;
+		float lfo_depth_ = 0;		
 		long lfo_counter_ = 0;
 		float prv_filter_ = 0;
 
@@ -169,7 +168,6 @@ class Mud : public Patch {
 			lpf_.tick();
 			hpf_.tick();
 			left_.tick();
-			right_.tick();
 			filter_gain_comp_.tick();
 		}
 };
@@ -179,22 +177,11 @@ class Mud : public Patch {
 // Internal data
 
 void Mud::fixFilterParams() {
-	// LFO - deadzone from [-10,10]
-	float lfo_depth = 0;
-	if (lfo_ < -10) {
-		lfo_depth = 20; // bigger on -ve side
-	} else if (lfo_ > 10) {
-		lfo_depth = 10;
-	}
-	float lfo_rate = fmax(fabs(lfo_) - 10.0, 0) * 0.0002;
-	if (lfo_ < 0) { // faster on -ve side
-		lfo_rate *= 3.0;
-	}
 	lfo_counter_ += 1;
 
-	float new_filter = filter_ + lfo_depth * sin(lfo_rate * lfo_counter_);
-	new_filter = fmin(fmax(new_filter, 0), 100); // clamp
-	new_filter = new_filter * 0.1 + prv_filter_ * 0.9; // LERP to new filter value
+	float new_filter = filter_ + lfo_depth_ * sin(lfo_rate_ * lfo_counter_);
+	new_filter = fmin(fmax(new_filter, 0.0f), 100.0f); // clamp
+	new_filter = new_filter * 0.05f + prv_filter_ * 0.95f; // LERP to new filter value
 	prv_filter_ = new_filter;
 
 	// calc params from meta-param
@@ -221,17 +208,20 @@ void Mud::fixFilterParams() {
 void Mud::processAudio(AudioBuffer &buffer) {
 	// TODO(dca): This is unsafe if mono buffers provided.
 	FloatArray left_buf = buffer.getSamples(LEFT_CHANNEL);
-	FloatArray right_buf = buffer.getSamples(RIGHT_CHANNEL);
 
 	// Update parameters
 	mix_ = getParameterValue(PARAMETER_A); 
 	filter_ = 100.0f * getParameterValue(PARAMETER_B);
-	lfo_ = 200.0f * getParameterValue(PARAMETER_C) - 100.0f;
-	fixFilterParams();
+	lfo_rate_ = 0.01f * getParameterValue(PARAMETER_C);
+	lfo_depth_ = 100.0f * getParameterValue(PARAMETER_D);
 
 	for (int i = 0; i < buffer.getSize(); ++i) {
+	    
+	    if (i % 16 == 0) {
+	        fixFilterParams();
+	    }
+	    	
 		left_buf[i] = process(left_, left_buf[i]);
-		right_buf[i] = process(right_, right_buf[i]);
 		tick();
 	}
 }
