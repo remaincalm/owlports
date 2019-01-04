@@ -292,7 +292,7 @@ Level: post-saturation gain\n"
 		// params
 		// gain
 		const float gain_db_ = 6.0;
-		SmoothParam<float> wet_out_db_ = 0.4;
+		SmoothParam<float> wet_out_db_ = -1000.0f; // start muted and fade in to avoid click
 
 		// filter
 		float filter_ = 0;
