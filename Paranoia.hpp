@@ -215,10 +215,10 @@ class Paranoia : public Patch {
 	public:
 
 		enum FilterMode {
-			MODE_OFF = 0,
-			MODE_LPF = 1,
+			MODE_OFF = 0, // unused
+			MODE_LPF = 1, // unused
 			MODE_BANDPASS = 2,
-			MODE_HPF = 3,
+			MODE_HPF = 3, // unused
 		};
 
 		struct Channel {
@@ -258,7 +258,7 @@ class Paranoia : public Patch {
 Level: post-saturation gain\n"
 "Crush: left 300Hz-30kHz 6-bit, right 300Hz-30kHz 10-bit, far-right 48kHz 10-bit\n"
 "Mangle: Sweep through bit flip/mute patterns (interactive w/ crush)\n"
-"Filter: 0-80 bandpass, 80-99 highpass, 100 raw";
+"Filter: 0-100 bandpass"
 */        
 			registerParameter(PARAMETER_A, "Level");
 			registerParameter(PARAMETER_B, "Crush");
@@ -355,17 +355,8 @@ void Paranoia::fixFilterParams() {
 	filter_gain_comp_ = 3.0f - fabs(fabs(160.0f - 3.2f * filter_) - 80.0f) / 40.0f;
 
 	// calc params from meta-param
-	if (filter_ <= 80) {
-		filter_mode_ = MODE_BANDPASS;
-		filter_res_ = 10 + (filter_ / 8.0f);
-	} else if (filter_ <= 99) {
-		filter_res_ = 40.0;
-		filter_gain_comp_ = 1;
-		filter_mode_ = MODE_HPF;
-	} else {
-		filter_gain_comp_ = 1;
-		filter_mode_ = MODE_OFF;
-	}
+	filter_mode_ = MODE_BANDPASS;
+	filter_res_ = 10 + (filter_ / 10.0f);
 
 	// set up R/C constants
 	float lc = powf(0.5, 4.6 - (filter_cutoff_ / 27.2));
