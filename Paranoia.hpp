@@ -284,6 +284,8 @@ Level: post-saturation gain\n"
 		signal_t process(Channel& ch, const signal_t in);
 
 		Channel left_;
+		Channel right_;		
+
 		Filter lpf_;
 		Filter hpf_;
 
@@ -406,9 +408,18 @@ void Paranoia::processAudio(AudioBuffer &buffer) {
 	updateParams();
 
 	// Process audio.  
+	bool is_stereo = buffer.getChannels() > 1;
 	FloatArray left_buf = buffer.getSamples(LEFT_CHANNEL);
+	FloatArray right_buf;
+	if (is_stereo) {
+		right_buf = buffer.getSamples(RIGHT_CHANNEL);	
+	}
+
 	for (int i = 0; i < buffer.getSize(); ++i) {
 		left_buf[i] = process(left_, left_buf[i]);
+		if (is_stereo) {
+			right_buf[i] = process(right_, right_buf[i]);		
+		}
 		tick();
 	} 
 }
